@@ -1,14 +1,16 @@
 library(tidyverse)
 
-ortho_data <- read_tsv("genes_with_compartments/gill_all_species_TSS_compartments.tsv", show_col_types = FALSE)
+# input
+ortho_data <- read_tsv("gill_all_species_TSS_compartments.tsv", show_col_types = FALSE)
 
 ortho_data <- ortho_data |>
   add_count(Orthogroup, spc, name = "n_copies") |>
   filter(Type == "Singleton") |> 
   filter(n_copies == 1)
 
+# count overview
 ortho_data |>
-  filter(Type == "Singleton") |>  # adjust column name
+  filter(Type == "Singleton") |>  
   count(Orthogroup, spc, name = "n_copies_per_species") |>
   count(n_copies_per_species)
 
@@ -17,11 +19,8 @@ ortho_data_1to1 <- ortho_data |>
   filter(n_copies == 1) |>
   select(-n_copies)
 
-# --- Derive discrete A/B compartment calls from E1 sign ---
-# Standard convention: E1 > 0 -> A compartment, E1 < 0 -> B compartment.
-# If a `compartment` column already exists upstream, swap this line to use it directly.
 ortho_data_1to1 <- ortho_data_1to1 |>
-  mutate(compartment = if_else(E1 > 0, "A", "B"))
+  mutate(compartment = if_else(E1 > 0, "A", "B")) ### remove this, not needed
 
 compartment_wide <- ortho_data_1to1 |>
   select(Orthogroup, spc, compartment) |>
@@ -40,14 +39,14 @@ species_list <- setdiff(colnames(compartment_wide), "Orthogroup")
 
 species_pairs <- combn(species_list, 2, simplify = FALSE)
 
-# --- Pairwise % compartment identity (A/B match rate) across singleton orthologs ---
+# Pairwise % compartment identity (A/B match rate) across singleton orthologs
 pairwise_conservation <- map_dfr(species_pairs, function(pair) {
   sp1 <- pair[1]
   sp2 <- pair[2]
   
   pair_data <- compartment_wide |>
     select(Orthogroup, all_of(sp1), all_of(sp2)) |>
-    drop_na()  # only orthologs with a called compartment in both species
+    drop_na() 
   
   n_pairs <- nrow(pair_data)
   
@@ -65,7 +64,6 @@ pairwise_conservation <- map_dfr(species_pairs, function(pair) {
   n_conserved <- sum(pair_data[[sp1]] == pair_data[[sp2]])
   pct_conserved <- 100 * n_conserved / n_pairs
   
-  # Test whether conservation exceeds the 50% expected by chance (2 categories)
   binom_test <- binom.test(n_conserved, n_pairs, p = 0.5, alternative = "greater")
   
   tibble(
@@ -78,7 +76,7 @@ pairwise_conservation <- map_dfr(species_pairs, function(pair) {
   )
 })
 
-# --- Multiple testing correction across all pairwise comparisons ---
+# Multiple testing correction across all pairwise comparisons
 pairwise_conservation <- pairwise_conservation |>
   mutate(
     p_adj = p.adjust(p_value, method = "BH"),
@@ -93,7 +91,7 @@ heatmap_data <- pairwise_conservation |>
       select(species1 = species2, species2 = species1, pct_conserved, n_orthologs)
   )
 
-species_order <- c("Upyg", "Eluc", "Omyk", "Salp", "Ssal")  # adjust to your phylogenetic order
+species_order <- c("Upyg", "Eluc", "Omyk", "Salp", "Ssal")  ## omyk and ssal closer?
 
 heatmap_data <- heatmap_data |>
   mutate(
@@ -124,7 +122,10 @@ library(ape)
 species_list <- c("Ssal", "Salp", "Omyk", "Eluc", "Upyg")
 outgroup     <- c("Eluc", "Upyg")
 
-# --- 1. Build distance matrix from pairwise % compartment conservation (heatmap_data) ---
+
+# phylogenetic tree
+
+# 1. Build distance matrix from pairwise % compartment conservation (heatmap_data) 
 # distance = 1 - proportion conserved (0 = identical compartments everywhere, 1 = never matches)
 
 n <- length(species_list)
@@ -141,13 +142,13 @@ for (i in seq_len(nrow(heatmap_data))) {
 
 compartment_dist <- as.dist(dist_matrix)
 
-# --- 2. Build UPGMA and NJ trees, root NJ on the outgroups ---
+# 2. Build UPGMA and NJ trees, root NJ on the outgroups 
 
 upgma_tree <- hclust(compartment_dist, method = "average")
 nj_tree    <- nj(compartment_dist)
 nj_rooted  <- root(nj_tree, outgroup = outgroup, resolve.root = TRUE)
 
-# --- 3. Prepare the per-ortholog compartment matrix for bootstrapping ---
+# 3. Prepare the per-ortholog compartment matrix for bootstrapping
 # compartment_wide: one row per Orthogroup, one column per species (with a leading
 # Orthogroup column) -> transpose to species (rows) x orthologs (columns),
 # and keep only orthologs with a compartment call across all six species.
@@ -160,7 +161,7 @@ compartment_matrix <- compartment_matrix[, colSums(is.na(compartment_matrix)) ==
 cat(sprintf("Orthologs used for bootstrap: %d (out of %d total)\n",
             ncol(compartment_matrix), nrow(compartment_wide)))
 
-# --- 4. Bootstrap: resample orthologs, rebuild the tree, repeat ---
+# 4. Bootstrap: resample orthologs, rebuild the tree, repeat
 # Distance is 1 - pairwise % identical compartment calls, matching step 1.
 # Bootstrap runs on the UNROOTED tree (standard, reliable use of
 # boot.phylo); each replicate is then rerooted the same way as nj_rooted,
@@ -197,7 +198,7 @@ class(boot_trees_rooted) <- "multiPhylo"
 bootstrap_support <- prop.clades(nj_rooted, boot_trees_rooted, rooted = TRUE)
 bootstrap_support[is.na(bootstrap_support)] <- 0
 
-# --- 5. Save ONE combined PDF: rooted NJ (with bootstrap) + UPGMA ---
+# 5. Save PDF: rooted NJ (with bootstrap) + UPGMA 
 
 graphics.off()
 
@@ -208,12 +209,12 @@ n_tips <- Ntip(nj_rooted)
 
 plot(nj_rooted, main = "Rooted NJ, with bootstrap support",
      cex = 0.9, label.offset = 0.01, no.margin = FALSE,
-     y.lim = c(-1, n_tips), font = 4)   # font 4 = bold italic (keeps species-name italics, adds bold)
+     y.lim = c(-1, n_tips), font = 4)   
 
 nodelabels(bootstrap_support, frame = "none", bg = "white",
-           adj = c(0.5, -0.8), cex = 0.8, font = 2)   # font 2 = bold
+           adj = c(0.5, -0.8), cex = 0.8, font = 2)  
 
-add.scale.bar(x = 0, y = -0.5, cex = 0.8)   # placed in the blank space below all tips
+add.scale.bar(x = 0, y = -0.5, cex = 0.8)  
 
 plot(upgma_tree, main = "UPGMA (A/B compartment) - gill",
      xlab = "", sub = "", ylab = "1 - % conserved", cex = 0.9)
