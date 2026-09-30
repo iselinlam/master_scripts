@@ -13,37 +13,39 @@ species_names <- tribble(
   "Upyg", "Eastern Mudminnow", "Umbra pygmaea"
 )
 
-combos <- expand_grid(spc = spc_levels, tissue = tissue_levels)
+# combos <- expand_grid(spc = spc_levels, tissue = tissue_levels)
+# 
+# files_list <- list()
+# 
+# for (i in seq_len(nrow(combos))) {
+#   spc_i    <- combos$spc[i]
+#   tissue_i <- combos$tissue[i]
+#   file <- file.path("all_duplicates_with_compartments",
+#                     paste0(spc_i, "_genes_wTSS_compartment_", tissue_i, ".tsv"))
+#   
+#   if (!file.exists(file)) {
+#     message(spc_i, " - ", tissue_i, ": file not found, skipping")
+#     next
+#   }
+#   
+#   singleton_genes <- read_tsv(file, show_col_types = FALSE) |> 
+#     mutate(spc = spc_i, tissue = tissue_i) |> 
+#     filter(Type == "Singleton") |> 
+#     add_count(Orthogroup, name = "n_copies") |>   # copies within this species
+#     filter(n_copies == 1) |>
+#     filter(compartment %in% c("A", "B")) |>       # compartment filter after copy count
+#     select(-n_copies, -seqname, -BeforeSS4R, -AfterSS4R, -Outgroup, -Tip,
+#            -tss_start, -tss_end)
+#   
+#   files_list[[paste(spc_i, tissue_i, sep = "_")]] <- singleton_genes
+# }
+# 
+# singleton_combined <- bind_rows(
+#   map(files_list, ~mutate(.x, chrom = as.character(chrom))))
+# 
+# write_tsv(singleton_combined, "singleton_analysis/singleton_combined.tsv", show_col_types = FALSE)
 
-files_list <- list()
-
-for (i in seq_len(nrow(combos))) {
-  spc_i    <- combos$spc[i]
-  tissue_i <- combos$tissue[i]
-  file <- file.path("all_duplicates_with_compartments",
-                    paste0(spc_i, "_genes_wTSS_compartment_", tissue_i, ".tsv"))
-  
-  if (!file.exists(file)) {
-    message(spc_i, " - ", tissue_i, ": file not found, skipping")
-    next
-  }
-  
-  singleton_genes <- read_tsv(file, show_col_types = FALSE) |> 
-    mutate(spc = spc_i, tissue = tissue_i) |> 
-    filter(Type == "Singleton") |> 
-    add_count(Orthogroup, name = "n_copies") |>   # copies within this species
-    filter(n_copies == 1) |>
-    filter(compartment %in% c("A", "B")) |>       # compartment filter after copy count
-    select(-n_copies, -seqname, -BeforeSS4R, -AfterSS4R, -Outgroup, -Tip,
-           -tss_start, -tss_end)
-  
-  files_list[[paste(spc_i, tissue_i, sep = "_")]] <- singleton_genes
-}
-
-singleton_combined <- bind_rows(
-  map(files_list, ~mutate(.x, chrom = as.character(chrom))))
-
-write_tsv(singleton_combined, "singleton_analysis/singleton_combined.tsv")
+singleton_combines <- read_tsv("singleton_combined.tsv)
 
 species_per_tissue <- singleton_combined |>
   distinct(tissue, spc) |>
