@@ -19,72 +19,77 @@ species_names <- tribble(
 output_dir <- "singleton_analysis"
 dir.create(output_dir, showWarnings = FALSE)
 
-comp_dir      <- "genes_assigned_compartment_zscore"
+# comp_dir      <- "genes_assigned_compartment_zscore"
 tissue_levels <- c("liver", "brain", "gill")
 
 # Reading input files and filter to only 1to1 singletons
 
-make_E1_z_wide <- function(tissue) {
-  
-  files <- list.files(comp_dir,
-                      pattern = paste0("_genes_wTSS_compartment_", tissue, "\\.tsv$"),
-                      full.names = TRUE)
-  
-  names(files) <- sub("_genes_wTSS_compartment_.*$", "", basename(files))
-  
-  message(tissue, ": ", length(files), " species files (",
-          paste(names(files), collapse = ", "), ")")
-  
-  ortho_data <- map_dfr(files,
-                        ~ read_tsv(.x, col_types = cols(.default = col_character())),
-                        .id = "spc") |>
-    mutate(E1_z = as.numeric(E1_z))
-  
-  singletons <- ortho_data |>
-    filter(Type == "Singleton") |>
-    add_count(Orthogroup, spc, name = "n_copies")
-  
-  # count table: all singleton genes vs 1:1 singleton genes, per species
-  counts <- singletons |>
-    group_by(spc) |>
-    summarise(n_singleton      = n(),
-              n_1to1_singleton = sum(n_copies == 1),
-              pct_1to1         = round(100 * n_1to1_singleton / n_singleton, 1),
-              .groups = "drop") |>
-    mutate(tissue = tissue, .before = 1)
-  
-  ortho_data_1to1 <- singletons |>
-    filter(n_copies == 1) |>
-    select(-n_copies)
-  
-  E1_z_wide <- ortho_data_1to1 |>
-    select(Orthogroup, spc, E1_z) |>
-    distinct() |>
-    pivot_wider(names_from = spc, values_from = E1_z)
-  
-  cat("\n--", tissue, "missingness --\n")
-  E1_z_wide |>
-    summarise(across(-Orthogroup, ~ sum(is.na(.)))) |>
-    pivot_longer(everything(), names_to = "species", values_to = "n_missing") |>
-    print(n = Inf)
-  
-  write_tsv(E1_z_wide,
-            file.path(output_dir, paste0("E1_z_singletons_1to1_", tissue, ".tsv")))
-  
-  list(E1_z_wide = E1_z_wide, counts = counts)
-}
+# make_E1_z_wide <- function(tissue) {
+#   
+#   files <- list.files(comp_dir,
+#                       pattern = paste0("_genes_wTSS_compartment_", tissue, "\\.tsv$"),
+#                       full.names = TRUE)
+#   
+#   names(files) <- sub("_genes_wTSS_compartment_.*$", "", basename(files))
+#   
+#   message(tissue, ": ", length(files), " species files (",
+#           paste(names(files), collapse = ", "), ")")
+#   
+#   ortho_data <- map_dfr(files,
+#                         ~ read_tsv(.x, col_types = cols(.default = col_character())),
+#                         .id = "spc") |>
+#     mutate(E1_z = as.numeric(E1_z))
+#   
+#   singletons <- ortho_data |>
+#     filter(Type == "Singleton") |>
+#     add_count(Orthogroup, spc, name = "n_copies")
+#   
+#   # count table: all singleton genes vs 1:1 singleton genes, per species
+#   counts <- singletons |>
+#     group_by(spc) |>
+#     summarise(n_singleton      = n(),
+#               n_1to1_singleton = sum(n_copies == 1),
+#               pct_1to1         = round(100 * n_1to1_singleton / n_singleton, 1),
+#               .groups = "drop") |>
+#     mutate(tissue = tissue, .before = 1)
+#   
+#   ortho_data_1to1 <- singletons |>
+#     filter(n_copies == 1) |>
+#     select(-n_copies)
+#   
+#   E1_z_wide <- ortho_data_1to1 |>
+#     select(Orthogroup, spc, E1_z) |>
+#     distinct() |>
+#     pivot_wider(names_from = spc, values_from = E1_z)
+#   
+#   cat("\n--", tissue, "missingness --\n")
+#   E1_z_wide |>
+#     summarise(across(-Orthogroup, ~ sum(is.na(.)))) |>
+#     pivot_longer(everything(), names_to = "species", values_to = "n_missing") |>
+#     print(n = Inf)
+#   
+#   write_tsv(E1_z_wide,
+#             file.path(output_dir, paste0("E1_z_singletons_1to1_", tissue, ".tsv")))
+#   
+#   list(E1_z_wide = E1_z_wide, counts = counts)
+# }
+# 
+# res <- set_names(tissue_levels) |> map(make_E1_z_wide)
+# 
+# E1_z_wide_list <- map(res, "E1_z_wide")   # E1_z_wide_list$gill etc.
+# 
+# singleton_counts <- map_dfr(res, "counts") |>
+#   mutate(tissue = factor(tissue, levels = tissue_levels)) |>
+#   arrange(tissue, spc)
+# 
+# print(singleton_counts, n = Inf)
+# write_tsv(singleton_counts, file.path(output_dir, "E1_z_singleton_1to1_counts.tsv"))
 
-res <- set_names(tissue_levels) |> map(make_E1_z_wide)
 
-E1_z_wide_list <- map(res, "E1_z_wide")   # E1_z_wide_list$gill etc.
-
-singleton_counts <- map_dfr(res, "counts") |>
-  mutate(tissue = factor(tissue, levels = tissue_levels)) |>
-  arrange(tissue, spc)
-
-print(singleton_counts, n = Inf)
-write_tsv(singleton_counts, file.path(output_dir, "E1_z_singleton_1to1_counts.tsv"))
-
+# ---- input files: 
+# - E1_z_singletons_1to1_brain.tsv
+# - E1_z_singletons_1to1_gill.tsv
+# - E1_z_singletons_1to1_liver.tsv
 
 # Pairwise correlation and Spearman heatmap, per tissue
 
