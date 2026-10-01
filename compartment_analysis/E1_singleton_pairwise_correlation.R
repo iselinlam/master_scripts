@@ -22,6 +22,7 @@ dir.create(output_dir, showWarnings = FALSE)
 comp_dir      <- "genes_assigned_compartment_zscore"
 tissue_levels <- c("liver", "brain", "gill")
 
+
 # Reading input files and filter to only 1to1 singletons
 
 make_e1_wide <- function(tissue) {
@@ -85,13 +86,10 @@ singleton_counts <- map_dfr(res, "counts") |>
 print(singleton_counts, n = Inf)
 write_tsv(singleton_counts, file.path(output_dir, "E1_singleton_1to1_counts.tsv"))
 
-# Pairwise correlation
+
+# Pairwise correlation and Spearman heatmap, per tissue
 
 species_order_all <- c("Upyg", "Eluc", "Tthy", "Omyk", "Salp", "Ssal")
-
-# =============================================================================
-# --- 2 + 3. Pairwise correlation and Spearman heatmap, per tissue ---
-# =============================================================================
 
 plot_e1_cor <- function(tissue) {
   
@@ -173,16 +171,12 @@ all_pairwise_cor <- map_dfr(cor_res, "cor")
 write_tsv(all_pairwise_cor, file.path(output_dir, "E1_pairwise_cor_singleton_1to1_all_tissues.tsv"))
 
 
-# Distance matrix (1 - Spearman rho) and trees
+# Distance matrix (1 - Spearman rho) and NJ + UPGMA and bootstrap, per tissue
  
 
 # tip label lookup: "Atlantic Salmon (Ssal)"
 tip_labels <- setNames(paste0(species_names$common_name, " (", species_names$spc, ")"),
                        species_names$spc)
-
-# =============================================================================
-# --- 4-6. Distance matrix, NJ, UPGMA and bootstrap, per tissue ---
-# =============================================================================
 
 make_trees <- function(tissue, B = 1000) {
   
@@ -262,8 +256,7 @@ make_trees <- function(tissue, B = 1000) {
   # --- relabel tips with common names (after bootstrap matching) ---
   nj_rooted$tip.label <- unname(tip_labels[nj_rooted$tip.label])
   upgma_tree$labels   <- unname(tip_labels[upgma_tree$labels])
-  
-  # --- save rooted NJ (bootstrap) + UPGMA ---
+
   graphics.off()
   pdf(file.path(output_dir, paste0("E1_upgma_", tissue, ".pdf")), width = 12, height = 7)
   par(mfrow = c(1, 2), mar = c(4, 2, 3, 6))
