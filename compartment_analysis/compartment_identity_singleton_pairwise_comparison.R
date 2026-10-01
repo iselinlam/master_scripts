@@ -13,6 +13,8 @@ species_names <- tribble(
   "Upyg", "Eastern Mudminnow", "Umbra pygmaea"
 )
 
+# ---- input file made with this code: 
+
 # combos <- expand_grid(spc = spc_levels, tissue = tissue_levels)
 # 
 # files_list <- list()
@@ -45,6 +47,8 @@ species_names <- tribble(
 # 
 # write_tsv(singleton_combined, "singleton_analysis/singleton_combined.tsv", show_col_types = FALSE)
 
+
+# ---- input file:
 singleton_combines <- read_tsv("singleton_combined.tsv)
 
 species_per_tissue <- singleton_combined |>
